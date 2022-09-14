@@ -21,6 +21,7 @@ SYSSIZE = 0x3000
 ! The loader has been made as simple as possible, and continuos
 ! read errors will result in a unbreakable loop. Reboot by hand. It
 ! loads pretty fast by getting whole sectors at a time whenever possible.
+# NOTE: 本身由BIOS加载到内存. bootsect.s将setup.s和head.s全部由硬盘加载到内存
 
 .globl begtext, begdata, begbss, endtext, enddata, endbss
 .text

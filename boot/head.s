@@ -1,6 +1,6 @@
 /*
  *  linux/boot/head.s
- *
+ *  # NOTE: 这是AT&T格式汇编
  *  (C) 1991  Linus Torvalds
  */
 
@@ -12,15 +12,15 @@
  * the page directory.
  */
 .text
-.globl _idt,_gdt,_pg_dir,_tmp_floppy_area
-_pg_dir:
+.globl _idt,_gdt,_pg_dir,_tmp_floppy_area #NOTE: 所有有前缀下划线的都是在C语言中定义的 (C语言中对应变量没有前缀下划线) (在kernel/sched.c, 72行)
+_pg_dir: # NOTE: 页目录
 startup_32:
-	movl $0x10,%eax
-	mov %ax,%ds
+	movl $0x10,%eax # GDT的2项
+	mov %ax,%ds # NOTE: 下面四个都变为内核数据段, 且基址一样 (段重叠了).
 	mov %ax,%es
 	mov %ax,%fs
 	mov %ax,%gs
-	lss _stack_start,%esp
+	lss _stack_start,%esp # NOTE: 将esp指向_stack_start这个值, esp是栈顶指针
 	call setup_idt
 	call setup_gdt
 	movl $0x10,%eax		# reload all the segment registers
