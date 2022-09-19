@@ -7,6 +7,7 @@ SYSSIZE = 0x3000
 !
 !	bootsect.s		(C) 1991 Linus Torvalds
 !
+! # NOTE: [为什么主引导记录的内存地址是0x7C00？](https://www.ruanyifeng.com/blog/2015/09/0x7c00.html)
 ! bootsect.s is loaded at 0x7c00 by the bios-startup routines, and moves
 ! iself out of the way to address 0x90000, and jumps there.
 !

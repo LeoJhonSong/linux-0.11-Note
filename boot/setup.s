@@ -190,7 +190,7 @@ end_move:
 
 	mov	ax,#0x0001	! protected mode (PE) bit # NOTE: 进入保护模式
 	lmsw	ax		! This is it!
-	jmpi	0,8		! jmp offset 0 of segment 8 (cs) # NOTE: GDT的0项. (在保护模式下)8是1000. 此处CS为段选择子
+	jmpi	0,8		! jmp offset 0 of segment 8 (cs) # NOTE: GDT的第1项. (在保护模式下)8是0000 1 (GDT/LDT) 0 (PL) 00. 此处CS为段选择子
 
 ! This routine checks that the keyboard command queue is empty
 ! No timeout is used - if this hangs there is something wrong with
@@ -202,11 +202,12 @@ empty_8042:
 	jnz	empty_8042	! yes - loop
 	ret
 
-gdt: # NOTE: 表中一共三项. (内存由低地址向高地址生长)
-	.word	0,0,0,0		! dummy # NOTE: 这项为空
+# NOTE: 段描述符为8字节长
+# TODO: p43, 图3-8
+gdt: # NOTE: 表中一共三个段描述符. (内存由低地址向高地址生长)
+	.word	0,0,0,0		! dummy # NOTE: 这个段描述符为空
 
-	# TODO: 基址: , 限长: , 特权:
-	.word	0x07FF		! 8Mb - limit=2047 (2048*4096=8Mb)
+	.word	0x07FF		! 8Mb - limit=2047 (2048*4096=8Mb) # NOTE: 这是最低四位
 	.word	0x0000		! base address=0
 	.word	0x9A00		! code read/exec
 	.word	0x00C0		! granularity=4096, 386

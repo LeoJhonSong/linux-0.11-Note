@@ -13,24 +13,25 @@
  */
 .text
 .globl _idt,_gdt,_pg_dir,_tmp_floppy_area #NOTE: 所有有前缀下划线的都是在C语言中定义的 (C语言中对应变量没有前缀下划线) (在kernel/sched.c, 72行)
-_pg_dir: # NOTE: 页目录
+_pg_dir: # NOTE: 页目录表有1k个页表. 一个页表有1k项页, 每页对应4k内存. 因此一个页表最多管理4M内存, 一个页目录表最多管理4G内存. (图1-37). 页目录表基址在CR3 (页目录表基址寄存器) 中记录, **记录的是物理地址**
 startup_32:
-	movl $0x10,%eax # GDT的2项
-	mov %ax,%ds # NOTE: 下面四个都变为内核数据段, 且基址一样 (段重叠了).
+	movl $0x10,%eax # FIXME: GDT的第2项
+	# NOTE: 下面5行在下几行有重复, 似乎无用
+	mov %ax,%ds
 	mov %ax,%es
 	mov %ax,%fs
 	mov %ax,%gs
-	lss _stack_start,%esp # NOTE: 将esp指向_stack_start这个值, esp是栈顶指针
-	call setup_idt
+	lss _stack_start,%esp
+	call setup_idt # NOTE: 中断描述符表在很后面才建立, 之所以这么早建立IDT, 可能是当时开发时增量式开发, 在这里先测试一下IDT实现是否成功
 	call setup_gdt
 	movl $0x10,%eax		# reload all the segment registers
-	mov %ax,%ds		# after changing gdt. CS was already
+	mov %ax,%ds		# after changing gdt. CS was alread # NOTE: 下面四个都变为内核数据段, 且基址一样 (段重叠了).y
 	mov %ax,%es		# reloaded in 'setup_gdt'
 	mov %ax,%fs
 	mov %ax,%gs
-	lss _stack_start,%esp
+	lss _stack_start,%es # NOTE: 将esp指向_stack_start这个值, esp是栈顶指针 (stack_start定义在C语言中, kernel/sched.c,L72)p
 	xorl %eax,%eax
-1:	incl %eax		# check that A20 really IS enabled
+1:	incl %eax		# check that A20 really IS enabled # NOTE: 越是偏硬件的代码越要注重自检. 此处检测原理在P34图1-33
 	movl %eax,0x000000	# loop forever if it isn't
 	cmpl %eax,0x100000
 	je 1b
@@ -40,7 +41,7 @@ startup_32:
  * 486 users probably want to set the NE (#5) bit also, so as to use
  * int 16 for math errors.
  */
-	movl %cr0,%eax		# check math chip
+	movl %cr0,%eax		# check math chip #NOTE: 检测是否存在数学协处理器X87
 	andl $0x80000011,%eax	# Save PG,PE,ET
 /* "orl $0x10020,%eax" here for 486 might be good */
 	orl $2,%eax		# set MP
@@ -75,8 +76,9 @@ check_x87:
  *  sure everything is ok. This routine will be over-
  *  written by the page tables.
  */
+# NOTE: IDT中一部分为指向GDT中一个段描述符, 为中断服务程序的段基址. 另一部分为指定中断服务程序在所在段上的偏移, 特权等
 setup_idt:
-	lea ignore_int,%edx
+	lea ignore_int,%edx # NOTE: 中断程序偏移地址
 	movl $0x00080000,%eax
 	movw %dx,%ax		/* selector = 0x0008 = cs */
 	movw $0x8E00,%dx	/* interrupt gate - dpl=0, present */
@@ -111,6 +113,7 @@ setup_gdt:
  * using 4 of them to span 16 Mb of physical memory. People with
  * more than 16MB will have to expand this.
  */
+# NOTE: 这都是内核页表 (图1-37)
 .org 0x1000
 pg0:
 
@@ -137,12 +140,13 @@ after_page_tables:
 	pushl $0
 	pushl $0
 	pushl $L6		# return address for main, if it decides to.
-	pushl $_main
+	pushl $_main #NOTE: 这里压栈后在跳转到setup_paging执行完然后ret后会进入C语言内核主函数. #FIXME: 不用call只是一个逻辑问题, 主函数被调用不是很合理?
 	jmp setup_paging
 L6:
 	jmp L6			# main should never return here, but
 				# just in case, we know what happens.
 
+# NOTE: 中断描述符表建立后这段代码并没有被覆盖掉
 /* This is the default interrupt "handler" :-) */
 int_msg:
 	.asciz "Unknown interrupt\n\r"
@@ -159,7 +163,7 @@ ignore_int:
 	mov %ax,%es
 	mov %ax,%fs
 	pushl $int_msg
-	call _printk
+	call _printk # NOTE: 此时还没有建立文件系统, 无法使用printf. 在系统完全建立后也有使用printk的情况: 在内核中进行输出. 此处打印149行字符串
 	popl %eax
 	pop %fs
 	pop %es
@@ -167,7 +171,7 @@ ignore_int:
 	popl %edx
 	popl %ecx
 	popl %eax
-	iret
+	iret # NOTE: 中断返回. 能看出这上面一段是关于中断的代码
 
 
 /*
