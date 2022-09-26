@@ -1,6 +1,6 @@
 /*
  *  linux/boot/head.s
- *  # NOTE: 这是AT&T格式汇编
+ *  # NOTE: AT&T汇编
  *  (C) 1991  Linus Torvalds
  */
 
@@ -13,7 +13,7 @@
  */
 .text
 .globl _idt,_gdt,_pg_dir,_tmp_floppy_area #NOTE: 所有有前缀下划线的都是在C语言中定义的 (C语言中对应变量没有前缀下划线) (在kernel/sched.c, 72行)
-_pg_dir: # NOTE: 页目录表有1k个页表. 一个页表有1k项页, 每页对应4k内存. 因此一个页表最多管理4M内存, 一个页目录表最多管理4G内存. (图1-37). 页目录表基址在CR3 (页目录表基址寄存器) 中记录, **记录的是物理地址**
+_pg_dir: # NOTE: 页目录表有1k个页表. 一个页表有1k项页, 每页对应4k内存. 因此一个页表最多管理4M内存, 一个页目录表最多管理4G内存. (图1-37). 由CR3 (页目录表基址寄存器) 指向页目录表基址, **记录的是物理地址**
 startup_32:
 	movl $0x10,%eax # FIXME: GDT的第2项
 	# NOTE: 下面5行在下几行有重复, 似乎无用
@@ -140,7 +140,9 @@ after_page_tables:
 	pushl $0
 	pushl $0
 	pushl $L6		# return address for main, if it decides to.
-	pushl $_main #NOTE: 这里压栈后在跳转到setup_paging执行完然后ret后会进入C语言内核主函数. #FIXME: 不用call只是一个逻辑问题, 主函数被调用不是很合理?
+	#NOTE: 这里压栈后在跳转到setup_paging执行完然后L224的ret后会进入C语言内核主函数.
+	# NOTE: 不用call只是一个逻辑问题, 内核主函数应当是最底层的, 被调用不合理, 应当是从主函数退出后继续操作的面向过程式
+	pushl $_main
 	jmp setup_paging
 L6:
 	jmp L6			# main should never return here, but
@@ -198,14 +200,17 @@ ignore_int:
  * some kind of marker at them (search for "16Mb"), but I
  * won't guarantee that's all :-( )
  */
+# NOTE: 32位线性空间最多寻址1M页. 高20位用于寻址, 由于硬件限制访问页的基址必然为4k整数倍, 因此低12位必然是0.
+# NOTE: 因此此处32位的低12位用于状态位, 低三位由高到低为U/S, R/W, P存在位
+# NOTE: 存在位可以指示是否已为线性内存分配了物理内存. 当运行到存在位为0的地址时报缺页中断申请分配内存
 .align 2
 setup_paging:
 	movl $1024*5,%ecx		/* 5 pages - pg_dir+4 page tables */
 	xorl %eax,%eax
 	xorl %edi,%edi			/* pg_dir is at 0x000 */
 	cld;rep;stosl
-	movl $pg0+7,_pg_dir		/* set present bit/user r/w */
-	movl $pg1+7,_pg_dir+4		/*  --------- " " --------- */
+	movl $pg0+7,_pg_dir		/* set present bit/user r/w */ # NOTE: 7 (0b111) 表示用户u, 读写rw, 存在p. r/w位为0表示只读
+	movl $pg1+7,_pg_dir+4		/*  --------- " " --------- */ #FIXME: 哪来的用户, 存在位置1就会自动映射?
 	movl $pg2+7,_pg_dir+8		/*  --------- " " --------- */
 	movl $pg3+7,_pg_dir+12		/*  --------- " " --------- */
 	movl $pg3+4092,%edi
@@ -215,10 +220,10 @@ setup_paging:
 	subl $0x1000,%eax
 	jge 1b
 	xorl %eax,%eax		/* pg_dir is at 0x0000 */
-	movl %eax,%cr3		/* cr3 - page directory start */
+	movl %eax,%cr3		/* cr3 - page directory start */ # NOTE: 通过由CR3指向页目录表基址给出当前线性地址空间. 汇编中都是mov但是操作CR3等特殊寄存器的语句汇编出的指令opcode与普通mov语句的opcode不同
 	movl %cr0,%eax
 	orl $0x80000000,%eax
-	movl %eax,%cr0		/* set paging (PG) bit */
+	movl %eax,%cr0		/* set paging (PG) bit */ # NOTE: 打开分页
 	ret			/* this also flushes prefetch-queue */
 
 .align 2

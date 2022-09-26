@@ -109,8 +109,9 @@ void main(void)		/* This really IS void, no error here. */
  */
  	ROOT_DEV = ORIG_ROOT_DEV;
  	drive_info = DRIVE_INFO;
-	memory_end = (1<<20) + (EXT_MEM_K<<10);
+	memory_end = (1<<20) + (EXT_MEM_K<<10); // NOTE: 打开A20后多出的内存空间称扩展内存. 原本支持的1M加扩展内存数即总内存大小
 	memory_end &= 0xfffff000;
+	// NOTE: 下面这个if-else用于根据内存总数选择不同物理内存规划格局
 	if (memory_end > 16*1024*1024)
 		memory_end = 16*1024*1024;
 	if (memory_end > 12*1024*1024) 

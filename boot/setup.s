@@ -1,5 +1,6 @@
 !
 !	setup.s		(C) 1991 Linus Torvalds
+! # NOTE: Intel汇编
 !
 ! setup.s is responsible for getting the system data from the BIOS,
 ! and putting them into the appropriate places in system memory.
