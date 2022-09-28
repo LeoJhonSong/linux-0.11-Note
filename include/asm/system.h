@@ -19,6 +19,11 @@ __asm__ ("movl %%esp,%%eax\n\t" \
 
 #define iret() __asm__ ("iret"::)
 
+/* NOTE: eax, edx都是4B, 先把值赋到两个寄存器, 然后直接把两个寄存器的值赋值到指定地址, 更新描述符
+   (一个描述符8B). 无法直接由内存mv到内存
+   edx初值高4位即GDT地址
+   教材图2-10
+ */
 #define _set_gate(gate_addr,type,dpl,addr) \
 __asm__ ("movw %%dx,%%ax\n\t" \
 	"movw %0,%%dx\n\t" \
@@ -28,16 +33,18 @@ __asm__ ("movw %%dx,%%ax\n\t" \
 	: "i" ((short) (0x8000+(dpl<<13)+(type<<8))), \
 	"o" (*((char *) (gate_addr))), \
 	"o" (*(4+(char *) (gate_addr))), \
-	"d" ((char *) (addr)),"a" (0x00080000))
+	"d" ((char *) (addr)),"a" (0x00080000)) // NOTE: d给edx初值, a给eax初值
 
+// NOTE: 中断门
 #define set_intr_gate(n,addr) \
 	_set_gate(&idt[n],14,0,addr)
 
+// NOTE: 陷阱门
 #define set_trap_gate(n,addr) \
-	_set_gate(&idt[n],15,0,addr)
+	_set_gate(&idt[n],15,0,addr) // NOTE: 0特权, 因此无法由用户主动唤起硬中断/硬异常
 
 #define set_system_gate(n,addr) \
-	_set_gate(&idt[n],15,3,addr)
+	_set_gate(&idt[n],15,3,addr) // NOTE: 这里是3特权, 因为是在**用户态**使用int0x80翻转到内核态
 
 #define _set_seg_desc(gate_addr,type,dpl,base,limit) {\
 	*(gate_addr) = ((base) & 0xff000000) | \
