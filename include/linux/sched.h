@@ -110,6 +110,7 @@ struct task_struct {
  *  INIT_TASK is used to set up the first task table, touch at
  * your own risk!. Base=0, limit=0x9ffff (=640kB)
  */
+// NOTE: 进程0的task_struct具体内容
 #define INIT_TASK \
 /* state etc */	{ 0,15,15, \
 /* signals */	0,{{},},0, \
@@ -126,7 +127,8 @@ struct task_struct {
 		{0x9f,0xc0f200}, \
 	}, \
 /*tss*/	{0,PAGE_SIZE+(long)&init_task,0x10,0,0,0,0,(long)&pg_dir,\
-	 0,0,0,0,0,0,0,0, \
+	/* NOTE: 下面第二个0是eflags的值, 决定了cli这类指令只能在0特权使用, 进程0不再能使用. 因此复制进程0创建出的进程也不能使用这类指令 */ \
+	0,0,0,0,0,0,0,0, \
 	 0,0,0x17,0x17,0x17,0x17,0x17,0x17, \
 	 _LDT(0),0x80000000, \
 		{} \

@@ -104,8 +104,8 @@ struct tty_queue * table_list[]={
 
 void tty_init(void)
 {
-	rs_init();
-	con_init();
+	rs_init();  // NOTE: 串口设置
+	con_init(); // NOTE: 显示器设置
 }
 
 void tty_intr(struct tty_struct * tty, int mask)

@@ -64,7 +64,7 @@ struct task_struct *last_task_used_math = NULL;
 
 struct task_struct * task[NR_TASKS] = {&(init_task.task), };
 
-long user_stack [ PAGE_SIZE>>2 ] ;
+long user_stack [ PAGE_SIZE>>2 ] ; // NOTE: 内核创建成功前的0特权栈. main函数中调用move_to_user_mode()后这个就是进程0的用户栈.
 
 struct {
 	long * a;
@@ -389,7 +389,9 @@ void sched_init(void)
 
 	if (sizeof(struct sigaction) != 16)
 		panic("Struct sigaction MUST be 16 bytes");
-	set_tss_desc(gdt+FIRST_TSS_ENTRY,&(init_task.task.tss));
+	// NOTE: 初始化进程0所拥有的TSS0和LDT0
+	// NOTE: 所有进程都是由父进程创建的, 进程0是由操作系统设计者事先写好的
+	set_tss_desc(gdt+FIRST_TSS_ENTRY,&(init_task.task.tss)); // NOTE: gdt为setup.s中建立的GDT表, 列表名即GDT基址
 	set_ldt_desc(gdt+FIRST_LDT_ENTRY,&(init_task.task.ldt));
 	p = gdt+2+FIRST_TSS_ENTRY;
 	for(i=1;i<NR_TASKS;i++) {
