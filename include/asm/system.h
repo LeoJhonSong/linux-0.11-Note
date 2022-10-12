@@ -1,11 +1,12 @@
 #define move_to_user_mode() \
+// TODO
 __asm__ ("movl %%esp,%%eax\n\t" \
-	"pushl $0x17\n\t" \
-	"pushl %%eax\n\t" \
-	"pushfl\n\t" \
-	"pushl $0x0f\n\t" \
-	"pushl $1f\n\t" \
-	"iret\n" \
+	"pushl $0x17\n\t" /* NOTE: SS */ \
+	"pushl %%eax\n\t" /* NOTE: ESP */ \
+	"pushfl\n\t" /* NOTE: EFLAGS */ \
+	"pushl $0x0f\n\t" /* NOTE: CS */ \
+	"pushl $1f\n\t" /* NOTE: EIP */ \
+	"iret\n" /* NOTE: 利用中断时硬件自动压栈的特性, 上面几行手动设置几个寄存器后触发中断 */ \
 	"1:\tmovl $0x17,%%eax\n\t" \
 	"movw %%ax,%%ds\n\t" \
 	"movw %%ax,%%es\n\t" \

@@ -55,6 +55,7 @@ union task_union {
 	char stack[PAGE_SIZE];
 };
 
+// NOTE: init_task.task即手写的task0内容INIT_TASK
 static union task_union init_task = {INIT_TASK,};
 
 long volatile jiffies=0;
@@ -62,9 +63,13 @@ long startup_time=0;
 struct task_struct *current = &(init_task.task);
 struct task_struct *last_task_used_math = NULL;
 
+// NOTE: 这个存有指向所有task_struct的指针的列表用于进行调度, 第0个是task0的task_struct
 struct task_struct * task[NR_TASKS] = {&(init_task.task), };
 
-long user_stack [ PAGE_SIZE>>2 ] ; // NOTE: 内核创建成功前的0特权栈. main函数中调用move_to_user_mode()后这个就是进程0的用户栈.
+// NOTE: 执行move_to_user_mode()前的0特权栈 (此时内核还没创建完成, 不存在内核栈
+// NOTE: 的概念). main函数中调用move_to_user_mode()后这个就是进程0的用户栈 (因此叫
+// NOTE: user_stack).
+long user_stack [ PAGE_SIZE>>2 ] ;
 
 struct {
 	long * a;
@@ -389,9 +394,12 @@ void sched_init(void)
 
 	if (sizeof(struct sigaction) != 16)
 		panic("Struct sigaction MUST be 16 bytes");
-	// NOTE: 初始化进程0所拥有的TSS0和LDT0
-	// NOTE: 所有进程都是由父进程创建的, 进程0是由操作系统设计者事先写好的
-	set_tss_desc(gdt+FIRST_TSS_ENTRY,&(init_task.task.tss)); // NOTE: gdt为setup.s中建立的GDT表, 列表名即GDT基址
+	/* NOTE: 初始化进程0所拥有的TSS0和LDT0
+	   NOTE: 所有进程都是由父进程创建的, 进程0是由操作系统设计者事先写好的
+	   NOTE: gdt为setup.s中建立的GDT表, 列表名即GDT基址
+	   NOTE: 因为gdt是描述符列表, +FIRST_TSS_ENTRY加的是FIRST_TSS_ENTRY个描述符的长度
+	*/
+	set_tss_desc(gdt+FIRST_TSS_ENTRY,&(init_task.task.tss));
 	set_ldt_desc(gdt+FIRST_LDT_ENTRY,&(init_task.task.ldt));
 	p = gdt+2+FIRST_TSS_ENTRY;
 	for(i=1;i<NR_TASKS;i++) {
@@ -403,12 +411,14 @@ void sched_init(void)
 	}
 /* Clear NT, so that we won't have troubles with that later on */
 	__asm__("pushfl ; andl $0xffffbfff,(%esp) ; popfl");
-	ltr(0);
+	// NOTE: GDT和IDT都只有一个, 但TSS, LDT都有64个, tr和ldtr所指向的才是当前运
+	// 行的进程. 此处指向了进程0的TSS和LDT, 进程0运行的准备已经做好了
+	ltr(0); // NOTE: TR的T是TSS
 	lldt(0);
 	outb_p(0x36,0x43);		/* binary, mode 3, LSB/MSB, ch 0 */
 	outb_p(LATCH & 0xff , 0x40);	/* LSB */
 	outb(LATCH >> 8 , 0x40);	/* MSB */
-	set_intr_gate(0x20,&timer_interrupt);
+	set_intr_gate(0x20,&timer_interrupt); // NOTE: 设置时钟中断
 	outb(inb_p(0x21)&~0x01,0x21);
 	set_system_gate(0x80,&system_call);
 }

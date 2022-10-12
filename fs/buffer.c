@@ -345,6 +345,7 @@ struct buffer_head * breada(int dev,int first, ...)
 	return (NULL);
 }
 
+// NOTE: 教材2.10内容
 void buffer_init(long buffer_end)
 {
 	struct buffer_head * h = start_buffer;

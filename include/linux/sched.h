@@ -110,7 +110,7 @@ struct task_struct {
  *  INIT_TASK is used to set up the first task table, touch at
  * your own risk!. Base=0, limit=0x9ffff (=640kB)
  */
-// NOTE: 进程0的task_struct具体内容
+// NOTE: 进程0的task_struct具体内容, 手写的
 #define INIT_TASK \
 /* state etc */	{ 0,15,15, \
 /* signals */	0,{{},},0, \
@@ -123,8 +123,9 @@ struct task_struct {
 /* filp */	{NULL,}, \
 	{ \
 		{0,0}, \
-/* ldt */	{0x9f,0xc0fa00}, \
-		{0x9f,0xc0f200}, \
+		/* TODO:  计算ldt0特权级 */ \
+/* ldt */	{0x9f,0xc0fa00}, /* 进程0代码段 */ \
+		{0x9f,0xc0f200}, /* 进程0数据段 */ \
 	}, \
 /*tss*/	{0,PAGE_SIZE+(long)&init_task,0x10,0,0,0,0,(long)&pg_dir,\
 	/* NOTE: 下面第二个0是eflags的值, 决定了cli这类指令只能在0特权使用, 进程0不再能使用. 因此复制进程0创建出的进程也不能使用这类指令 */ \
@@ -152,6 +153,7 @@ extern void wake_up(struct task_struct ** p);
  * Entry into gdt where to find first TSS. 0-nul, 1-cs, 2-ds, 3-syscall
  * 4-TSS0, 5-LDT0, 6-TSS1 etc ...
  */
+// TODO: 利用这段画完图2-17的LDT, TSS
 #define FIRST_TSS_ENTRY 4
 #define FIRST_LDT_ENTRY (FIRST_TSS_ENTRY+1)
 #define _TSS(n) ((((unsigned long) n)<<4)+(FIRST_TSS_ENTRY<<3))
