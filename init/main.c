@@ -20,6 +20,7 @@
  * won't be any messing with the stack from main(), but we define
  * some others too.
  */
+// NOTE: inline和宏函数性质类似, 但宏函数在预处理阶段进行, inline则在编译阶段词法分析后才展开
 static inline _syscall0(int,fork)
 static inline _syscall0(int,pause)
 static inline _syscall1(int,setup,void *,BIOS)

@@ -1,12 +1,13 @@
 #define move_to_user_mode() \
 // TODO
 __asm__ ("movl %%esp,%%eax\n\t" \
-	"pushl $0x17\n\t" /* NOTE: SS */ \
-	"pushl %%eax\n\t" /* NOTE: ESP */ \
+	"pushl $0x17\n\t" /* NOTE: SS, 0特权栈的代码段 */ \
+	"pushl %%eax\n\t" /* NOTE: ESP, 就是原本的ESP */ \
 	"pushfl\n\t" /* NOTE: EFLAGS */ \
 	"pushl $0x0f\n\t" /* NOTE: CS */ \
-	"pushl $1f\n\t" /* NOTE: EIP */ \
-	"iret\n" /* NOTE: 利用中断时硬件自动压栈的特性, 上面几行手动设置几个寄存器后触发中断 */ \
+	"pushl $1f\n\t" /* NOTE: EIP, $1f是下面1标签行地址的高位. 因此模拟压栈及中断返回后就是执行的下面几行 */ \
+	"iret\n" /* NOTE: 利用中断时硬件自动压栈, 返回时自动弹栈的特性, 上面几行手动设置几个寄存器后触发中断返回 */ \
+	/* 这行以上是0特权执行, 下面是3特权级 */ \
 	"1:\tmovl $0x17,%%eax\n\t" \
 	"movw %%ax,%%ds\n\t" \
 	"movw %%ax,%%es\n\t" \

@@ -53,7 +53,7 @@ int copy_mem(int nr,struct task_struct * p)
 	p->start_code = new_code_base;
 	set_base(p->ldt[1],new_code_base);
 	set_base(p->ldt[2],new_data_base);
-	if (copy_page_tables(old_data_base,new_data_base,data_limit)) {
+	if (copy_page_tables(old_data_base,new_data_base,data_limit)) { // NOTE: 此数据段限长是老的限长
 		free_page_tables(new_data_base,data_limit);
 		return -ENOMEM;
 	}
@@ -64,6 +64,10 @@ int copy_mem(int nr,struct task_struct * p)
  *  Ok, this is the main fork-routine. It copies the system process
  * information (task[nr]) and sets up the necessary registers. It
  * also copies the data segment in it's entirety.
+ */
+/* NOTE: 此处参数由kernel/system_call.s中多个函数通过压栈传参. 通常最后压入栈的是最前面的参数.
+   NOTE: nr到gs为_sys_fork压入, none为_system_call中call _sys_call_table(,%eax,4)时压入的EIP (none只用于占位, 此EIP没有用),
+   NOTE: ebx到ds为_system_call压入, eip到ss为触发int80时硬件压入
  */
 int copy_process(int nr,long ebp,long edi,long esi,long gs,long none,
 		long ebx,long ecx,long edx,
@@ -79,6 +83,8 @@ int copy_process(int nr,long ebp,long edi,long esi,long gs,long none,
 		return -EAGAIN;
 	task[nr] = p;
 	*p = *current;	/* NOTE! this doesn't copy the supervisor stack */
+	// NOTE: 这里不写挂起子进程会不会真的被调度运行在不同操作系统不一样. 非抢占式操作系统
+	// NOTE: 在运行内核代码时不会响应时钟中断, 就不会进入调度. 但抢占式操作系统则会进入调度, 不明确将状态置为挂起就有问题.
 	p->state = TASK_UNINTERRUPTIBLE;
 	p->pid = last_pid;
 	p->father = current->pid;

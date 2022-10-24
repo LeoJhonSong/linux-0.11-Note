@@ -1,6 +1,8 @@
 /*
  *  linux/boot/head.s
- *  # NOTE: AT&T汇编
+ *  # NOTE: bootsect.s与setup.s采用近似intel的汇编语言语法, 使用intel8086汇编编译器as86,
+ *  # NOTE: 而head.s采用AT&T汇编语言语法, 使用GNU汇编编译器as, 是因为对于intelx86系列处理器,
+ *  # NOTE: as仅支持i386及之后的处理器, 且不支持生成运行在实模式下的程序
  *  (C) 1991  Linus Torvalds
  */
 
@@ -209,8 +211,10 @@ setup_paging:
 	xorl %eax,%eax
 	xorl %edi,%edi			/* pg_dir is at 0x000 */
 	cld;rep;stosl
-	movl $pg0+7,_pg_dir		/* set present bit/user r/w */ # NOTE: 7 (0b111) 表示用户u, 读写rw, 存在p. r/w位为0表示只读
-	movl $pg1+7,_pg_dir+4		/*  --------- " " --------- */ #FIXME: 哪来的用户, 存在位置1就会自动映射?
+	# NOTE: 7 (0b111) 表示用户u, 读写rw, 存在p. r/w位为0表示只读
+	# NOTE: 设为3特权级, 这样move_touser_mode()后与原本0特权栈重合的进程0的用户栈才能用
+	movl $pg0+7,_pg_dir		/* set present bit/user r/w */
+	movl $pg1+7,_pg_dir+4		/*  --------- " " --------- */
 	movl $pg2+7,_pg_dir+8		/*  --------- " " --------- */
 	movl $pg3+7,_pg_dir+12		/*  --------- " " --------- */
 	movl $pg3+4092,%edi
@@ -240,8 +244,9 @@ gdt_descr:
 	.align 3
 _idt:	.fill 256,8,0		# idt is uninitialized
 
+# NOTE: 后续C语言内核代码中的gdt列表变量
 _gdt:	.quad 0x0000000000000000	/* NULL descriptor */
 	.quad 0x00c09a0000000fff	/* 16Mb */
-	.quad 0x00c0920000000fff	/* 16Mb */
+	.quad 0x00c0920000000fff	/* NOTE: 16Mb, 数据段 */
 	.quad 0x0000000000000000	/* TEMPORARY - don't use */
 	.fill 252,8,0			/* space for LDT's and TSS's etc */

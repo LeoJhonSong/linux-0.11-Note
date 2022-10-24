@@ -155,16 +155,17 @@ int copy_page_tables(unsigned long from,unsigned long to,long size)
 	unsigned long * from_dir, * to_dir;
 	unsigned long nr;
 
+	// NOTE: 一个页目录表项管理的4M, 这段是必须对齐地址空间的意思
 	if ((from&0x3fffff) || (to&0x3fffff))
 		panic("copy_page_tables called with wrong alignment");
-	from_dir = (unsigned long *) ((from>>20) & 0xffc); /* _pg_dir = 0 */
+	from_dir = (unsigned long *) ((from>>20) & 0xffc); /* _pg_dir = 0 */ // NOTE: 页目录表项个数
 	to_dir = (unsigned long *) ((to>>20) & 0xffc);
 	size = ((unsigned) (size+0x3fffff)) >> 22;
 	for( ; size-->0 ; from_dir++,to_dir++) {
-		if (1 & *to_dir)
+		if (1 & *to_dir) // NOTE: 页目录表项数据最后一位是存在位, 如果这个地址已经被分配了, 就不用了
 			panic("copy_page_tables: already exist");
 		if (!(1 & *from_dir))
-			continue;
+			continue; // NOTE: 如果没有东西就不复制
 		from_page_table = (unsigned long *) (0xfffff000 & *from_dir);
 		if (!(to_page_table = (unsigned long *) get_free_page()))
 			return -1;	/* Out of memory, see freeing */
@@ -184,7 +185,7 @@ int copy_page_tables(unsigned long from,unsigned long to,long size)
 			}
 		}
 	}
-	invalidate();
+	invalidate(); // NOTE: 清TLB缓存
 	return 0;
 }
 

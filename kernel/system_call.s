@@ -78,7 +78,7 @@ reschedule:
 	jmp _schedule
 .align 2
 _system_call:
-	cmpl $nr_system_calls-1,%eax
+	cmpl $nr_system_calls-1,%eax # NOTE: 检测是否访问越界, 核实是不是独立访问
 	ja bad_sys_call
 	push %ds
 	push %es
@@ -91,7 +91,7 @@ _system_call:
 	mov %dx,%es
 	movl $0x17,%edx		# fs points to local data space
 	mov %dx,%fs
-	call _sys_call_table(,%eax,4)
+	call _sys_call_table(,%eax,4) # NOTE: eax为函数指针列表的下标, 4为传给函数的参数
 	pushl %eax
 	movl _current,%eax
 	cmpl $0,state(%eax)		# state
