@@ -21,7 +21,8 @@
  * some others too.
  */
 // NOTE: inline和宏函数性质类似, 但宏函数在预处理阶段进行, inline则在编译阶段词法分析后才展开
-static inline _syscall0(int,fork)
+// NOTE: _syscall0定义在include/unistd.h
+static inline _syscall0(int,fork) // NOTE: 展开后是int fork() {...}
 static inline _syscall0(int,pause)
 static inline _syscall1(int,setup,void *,BIOS)
 static inline _syscall0(int,sync)
@@ -137,6 +138,10 @@ void main(void)		/* This really IS void, no error here. */
 	floppy_init();
 	sti();
 	move_to_user_mode();
+	// NOTE: fork()在25行由_syscall0(int,fork)定义.fork()可能有三种返回值:
+	// NOTE: 1. 从父进程返回: 子进程的进程ID
+	// NOTE: 2. 从子进程返回: 0
+	// NOTE: 3. 错误: -1
 	if (!fork()) {		/* we count on this going ok */
 		init();
 	}
@@ -147,6 +152,7 @@ void main(void)		/* This really IS void, no error here. */
  * can run). For task0 'pause()' just means we go check if some other
  * task can run, and if not we return here.
  */
+	// NOTE: 这是进程0的代码
 	for(;;) pause();
 }
 

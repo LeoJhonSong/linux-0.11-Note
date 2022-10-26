@@ -135,7 +135,7 @@ type name(void) \
 { \
 long __res; \
 __asm__ volatile ("int $0x80" \
-	: "=a" (__res) \
+	: "=a" (__res) /* NOTE: "=a"表示__res对应eax寄存器的值 */ \
 	: "0" (__NR_##name)); \
 if (__res >= 0) \
 	return (type) __res; \

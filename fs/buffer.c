@@ -264,6 +264,7 @@ void brelse(struct buffer_head * buf)
  * bread() reads a specified block and returns the buffer that contains
  * it. It returns NULL if the block was unreadable.
  */
+// NOTE: 设备号 (buffer_head中b_dev), 块号 (buffer_head中b_blocknr. linux0.11中1k一个块, 即扇区号//2)
 struct buffer_head * bread(int dev,int block)
 {
 	struct buffer_head * bh;

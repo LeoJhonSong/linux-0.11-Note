@@ -1,5 +1,4 @@
 #define move_to_user_mode() \
-// TODO
 __asm__ ("movl %%esp,%%eax\n\t" \
 	"pushl $0x17\n\t" /* NOTE: SS, 0特权栈的代码段 */ \
 	"pushl %%eax\n\t" /* NOTE: ESP, 就是原本的ESP */ \
