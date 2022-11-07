@@ -254,7 +254,8 @@ static void read_intr(void)
 		do_hd_request();
 		return;
 	}
-	port_read(HD_DATA,CURRENT->buffer,256);
+	// NOTE: 老的PIO的硬盘的机制是将请求的数据挪至*硬盘的*缓冲后就向CPU发中断, 然后用下面这句读取数据
+	port_read(HD_DATA,CURRENT->buffer,256); // NOTE: 大写这个CURRENT是当前请求项
 	CURRENT->errors = 0;
 	CURRENT->buffer += 512;
 	CURRENT->sector++;
@@ -262,7 +263,7 @@ static void read_intr(void)
 		do_hd = &read_intr;
 		return;
 	}
-	end_request(1);
+	end_request(1); // NOTE: 置1校验数据一致性
 	do_hd_request();
 }
 
@@ -335,7 +336,7 @@ void do_hd_request(void)
 		}
 		port_write(HD_DATA,CURRENT->buffer,256);
 	} else if (CURRENT->cmd == READ) {
-		hd_out(dev,nsect,sec,head,cyl,WIN_READ,&read_intr);
+		hd_out(dev,nsect,sec,head,cyl,WIN_READ,&read_intr); // NOTE: 此时实际挂起的就是read_intr中断
 	} else
 		panic("unknown hd-command");
 }

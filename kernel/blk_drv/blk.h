@@ -90,7 +90,7 @@ extern struct task_struct * wait_for_request;
 
 #endif
 
-#define CURRENT (blk_dev[MAJOR_NR].current_request)
+#define CURRENT (blk_dev[MAJOR_NR].current_request) // NOTE: 全局变量, 当前请求项
 #define CURRENT_DEV DEVICE_NR(CURRENT->dev)
 
 #ifdef DEVICE_INTR
@@ -118,7 +118,7 @@ extern inline void end_request(int uptodate)
 		printk("dev %04x, block %d\n\r",CURRENT->dev,
 			CURRENT->bh->b_blocknr);
 	}
-	wake_up(&CURRENT->waiting);
+	wake_up(&CURRENT->waiting); // NOTE: 这行在Linux0.12+才有用
 	wake_up(&wait_for_request);
 	CURRENT->dev = -1;
 	CURRENT = CURRENT->next;

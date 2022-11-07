@@ -178,7 +178,7 @@ __asm__("cmpl %%ecx,_current\n\t" \
 	"je 1f\n\t" \
 	"movw %%dx,%1\n\t" \
 	"xchgl %%ecx,_current\n\t" \
-	"ljmp %0\n\t" \
+	"ljmp %0\n\t" /* NOTE: 强行切换进程. 这个ljmp不能按字面意思理解为跳转到TSS这个数据段,  而是恢复这个TSS记录的任务现场 */ \
 	"cmpl %%ecx,_last_task_used_math\n\t" \
 	"jne 1f\n\t" \
 	"clts\n" \

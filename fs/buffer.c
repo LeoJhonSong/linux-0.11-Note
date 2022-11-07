@@ -36,6 +36,7 @@ int NR_BUFFERS = 0;
 static inline void wait_on_buffer(struct buffer_head * bh)
 {
 	cli();
+	// NOTE: 之所以是while是因为sleep_on()返回后这个块不一定就解锁了, 可能当前进程触发的中断还没处理完, 也可能又被其他进程锁上了
 	while (bh->b_lock)
 		sleep_on(&bh->b_wait);
 	sti();
@@ -267,15 +268,15 @@ void brelse(struct buffer_head * buf)
 // NOTE: 设备号 (buffer_head中b_dev), 块号 (buffer_head中b_blocknr. linux0.11中1k一个块, 即扇区号//2)
 struct buffer_head * bread(int dev,int block)
 {
-	struct buffer_head * bh;
+	struct buffer_head * bh; // NOTE: 这是全局的
 
 	if (!(bh=getblk(dev,block)))
 		panic("bread: getblk returned NULL\n");
 	if (bh->b_uptodate)
 		return bh;
-	ll_rw_block(READ,bh);
-	wait_on_buffer(bh);
-	if (bh->b_uptodate)
+	ll_rw_block(READ,bh); // NOTE: ll估计是low level的意思
+	wait_on_buffer(bh); // NOTE: 同步过程相对来说很慢, 此时不会浪费时间, 在这个等待过程中会尝试调度.
+	if (bh->b_uptodate) // NOTE: 如果数据一致
 		return bh;
 	brelse(bh);
 	return NULL;

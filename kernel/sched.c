@@ -134,21 +134,22 @@ void schedule(void)
 		while (--i) {
 			if (!*--p)
 				continue;
-			if ((*p)->state == TASK_RUNNING && (*p)->counter > c)
+			if ((*p)->state == TASK_RUNNING && (*p)->counter > c) // NOTE: 选择就绪状态且时间片最长的 (时间片长说明最久没有被调度到)
 				c = (*p)->counter, next = i;
 		}
-		if (c) break;
+		if (c) break; // NOTE: 注意bool(-1) == 1, 因此当所有任务都挂起时在c=-1, next=0时就跳出
 		for(p = &LAST_TASK ; p > &FIRST_TASK ; --p)
 			if (*p)
 				(*p)->counter = ((*p)->counter >> 1) +
 						(*p)->priority;
 	}
+	// NOTE: 当所有任务都挂起时, 到这里next=0, 即切换到0进程. 而进程0中是`for(;;) pause();`, 因此会切换到0进程后死循环直到有其他进程能被调度
 	switch_to(next);
 }
 
 int sys_pause(void)
 {
-	current->state = TASK_INTERRUPTIBLE;
+	current->state = TASK_INTERRUPTIBLE; // NOTE: 为了因为中断触发时也能应对, 这里设置成可打断
 	schedule();
 	return 0;
 }
@@ -160,7 +161,9 @@ void sleep_on(struct task_struct **p)
 	if (!p)
 		return;
 	if (current == &(init_task.task))
+		// NOTE: 进程0试图等待肯定是出错了
 		panic("task[0] trying to sleep");
+	// TODO: 这两行, 当有多个进程在等待时会形成一个等待队列, 这里要看懂. 唤醒时反向唤醒.
 	tmp = *p;
 	*p = current;
 	current->state = TASK_UNINTERRUPTIBLE;
@@ -193,8 +196,8 @@ repeat:	current->state = TASK_INTERRUPTIBLE;
 void wake_up(struct task_struct **p)
 {
 	if (p && *p) {
-		(**p).state=0;
-		*p=NULL;
+		(**p).state=0; // NOTE: 0就是TASK_RUNNING
+		*p=NULL; // NOTE: 往回清唤醒队列
 	}
 }
 

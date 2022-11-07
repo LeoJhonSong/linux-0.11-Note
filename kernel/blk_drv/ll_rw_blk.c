@@ -113,7 +113,7 @@ repeat:
  * of the requests are only for reads.
  */
 	if (rw == READ)
-		req = request+NR_REQUEST;
+		req = request+NR_REQUEST; // 数值的差距意味着读优先
 	else
 		req = request+((NR_REQUEST*2)/3);
 /* find an empty request */
