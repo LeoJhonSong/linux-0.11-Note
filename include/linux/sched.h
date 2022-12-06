@@ -121,11 +121,10 @@ struct task_struct {
 /* math */	0, \
 /* fs info */	-1,0022,NULL,NULL,NULL,0, \
 /* filp */	{NULL,}, \
-	{ \
-		{0,0}, \
-		/* TODO: 计算ldt0特权级. 代码段数据段基址0, 限长640KB */ \
-/* ldt */	{0x9f,0xc0fa00}, /* 进程0代码段 */ \
-		{0x9f,0xc0f200}, /* 进程0数据段 */ \
+/*ldt*/	{ \
+		{0,0}, /*NOTE: 进程0空段描述符*/ \
+		{0x9f,0xc0fa00}, /* NOTE: 进程0代码段, 限长640KB */ \
+		{0x9f,0xc0f200}, /* NOTE: 进程0数据段 */ \
 	}, \
 /*tss*/	{0,PAGE_SIZE+(long)&init_task,0x10,0,0,0,0,(long)&pg_dir,\
 	/* NOTE: 下面第二个0是eflags的值, 决定了cli这类指令只能在0特权使用, 进程0不再能使用. 因此复制进程0创建出的进程也不能使用这类指令 */ \
@@ -153,7 +152,7 @@ extern void wake_up(struct task_struct ** p);
  * Entry into gdt where to find first TSS. 0-nul, 1-cs, 2-ds, 3-syscall
  * 4-TSS0, 5-LDT0, 6-TSS1 etc ...
  */
-// TODO: 利用这段画完图2-17的LDT, TSS
+// NOTE: Linux内核设计的艺术 图2-17
 #define FIRST_TSS_ENTRY 4
 #define FIRST_LDT_ENTRY (FIRST_TSS_ENTRY+1)
 #define _TSS(n) ((((unsigned long) n)<<4)+(FIRST_TSS_ENTRY<<3))

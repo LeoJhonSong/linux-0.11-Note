@@ -73,7 +73,7 @@ load_setup:
 	mov	bx,#0x0200		! address = 512, in INITSEG
 	mov	ax,#0x0200+SETUPLEN	! service 2, nr of sectors
 	int	0x13			! read it
-	jnc	ok_load_setup		! ok - continue
+	jnc	ok_load_setup		! ok - continue # NOTE: 当int0x13没有执行出错就跳转到ok_load_setup标签, 否则清掉数据跳回load_setup标签重来
 	mov	dx,#0x0000
 	mov	ax,#0x0000		! reset the diskette
 	int	0x13

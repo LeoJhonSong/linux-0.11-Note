@@ -204,7 +204,6 @@ empty_8042:
 	ret
 
 # NOTE: 段描述符为8字节长
-# TODO: p43, 图3-8
 gdt: # NOTE: 表中一共三个段描述符. (内存由低地址向高地址生长)
 	.word	0,0,0,0		! dummy # NOTE: 这个段描述符为空
 
@@ -224,7 +223,7 @@ idt_48: # NOTE: 基址限长都是0, IDT现在为空
 
 gdt_48: # NOTE: GDTR, GDT的寄存器
 	.word	0x800		! gdt limit=2048, 256 GDT entries
-	.word	512+gdt,0x9	! gdt base = 0X9xxxx
+	.word	512+gdt,0x9	! gdt base = 0X9xxxx // NOTE: 0x90000+512即0x90200, setup的起始地址
 	
 .text
 endtext:

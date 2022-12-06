@@ -17,7 +17,7 @@
 .globl _idt,_gdt,_pg_dir,_tmp_floppy_area #NOTE: 所有有前缀下划线的都是在C语言中定义的 (C语言中对应变量没有前缀下划线) (在kernel/sched.c, 72行)
 _pg_dir: # NOTE: 页目录表有1k个页表. 一个页表有1k项页, 每页对应4k内存. 因此一个页表最多管理4M内存, 一个页目录表最多管理4G内存. (图1-37). 由CR3 (页目录表基址寄存器) 指向页目录表基址, **记录的是物理地址**
 startup_32:
-	movl $0x10,%eax # FIXME: GDT的第2项
+	movl $0x10,%eax
 	# NOTE: 下面5行在下几行有重复, 似乎无用
 	mov %ax,%ds
 	mov %ax,%es
@@ -27,7 +27,7 @@ startup_32:
 	call setup_idt # NOTE: 中断描述符表在很后面才建立, 之所以这么早建立IDT, 可能是当时开发时增量式开发, 在这里先测试一下IDT实现是否成功
 	call setup_gdt
 	movl $0x10,%eax		# reload all the segment registers
-	mov %ax,%ds		# after changing gdt. CS was alread # NOTE: 下面四个都变为内核数据段, 且基址一样 (段重叠了).y
+	mov %ax,%ds		# after changing gdt. CS was alread # NOTE: DS, ES, FS, GS都变为内核数据段, 且基址一样 (段重叠了), 都是值为0x10的段选择子指向的GDT表第2项
 	mov %ax,%es		# reloaded in 'setup_gdt'
 	mov %ax,%fs
 	mov %ax,%gs
@@ -137,6 +137,7 @@ pg3:
 _tmp_floppy_area:
 	.fill 1024,1,0
 
+# NOTE: 这段到_idt标签前的代码刚好没有在head.s执行完后被覆盖掉
 after_page_tables:
 	pushl $0		# These are the parameters to main :-)
 	pushl $0
@@ -150,7 +151,6 @@ L6:
 	jmp L6			# main should never return here, but
 				# just in case, we know what happens.
 
-# NOTE: 中断描述符表建立后这段代码并没有被覆盖掉
 /* This is the default interrupt "handler" :-) */
 int_msg:
 	.asciz "Unknown interrupt\n\r"
@@ -213,7 +213,7 @@ setup_paging:
 	cld;rep;stosl
 	# NOTE: 7 (0b111) 表示用户u, 读写rw, 存在p. r/w位为0表示只读
 	# NOTE: 设为3特权级, 这样move_touser_mode()后与原本0特权栈重合的进程0的用户栈才能用
-	movl $pg0+7,_pg_dir		/* set present bit/user r/w */
+	movl $pg0+7,_pg_dir		/* set present bit/user r/w */ # NOTE: 放到内存起始位置处
 	movl $pg1+7,_pg_dir+4		/*  --------- " " --------- */
 	movl $pg2+7,_pg_dir+8		/*  --------- " " --------- */
 	movl $pg3+7,_pg_dir+12		/*  --------- " " --------- */
