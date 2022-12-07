@@ -143,7 +143,7 @@ after_page_tables:
 	pushl $0
 	pushl $0
 	pushl $L6		# return address for main, if it decides to.
-	#NOTE: 这里压栈后在跳转到setup_paging执行完然后L224的ret后会进入C语言内核主函数.
+	# NOTE: 这里压栈后在跳转到setup_paging执行完然后L224的ret后会进入C语言内核主函数.
 	# NOTE: 不用call只是一个逻辑问题, 内核主函数应当是最底层的, 被调用不合理, 应当是从主函数退出后继续操作的面向过程式
 	pushl $_main
 	jmp setup_paging

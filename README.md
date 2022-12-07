@@ -165,6 +165,244 @@
    >
    > *CPL*, *IOPL* (IO特权域, EFLAGS[13:12]), CR4中*VME*标志 (当处于虚拟8086模式时) 决定*IF*标志 (中断许可, EFLAGS[9]) 是否可由`CLI`, `STI`, `POPF`, `POPFD`, `IRET`指令修改. 进程0的EFLAGS被设为0, 因此无法再以3特权级执行`cli`等指令, 而所有其他进程都是`fork`进程0得到的, 因此3特权级进程都无法使用`cli`指令.
 
+8. 内核的线性地址空间是如何分页的?画出从`0X000000`开始的6个页 (包括页目录表, 页表所在页) 的挂接关系图, 第一个页表的前6个页表项指向什么位置? 给出代码证据.
+
+   > *Linux内核设计的艺术* **27**-**29**页, 页目录表及四个内核页表的初始化.
+
+9. 在**head**程序执行结束的时候, 在idt的前面有184个字节的**head**程序的剩余代码, 剩余了什么? 为什么要剩余?
+
+   > ```c
+   > after_page_tables:
+   > 	pushl $0		# These are the parameters to main :-)
+   > 	pushl $0
+   > 	pushl $0
+   > 	pushl $L6		# return address for main, if it decides to.
+   > 	/* NOTE: 这里压栈后在跳转到setup_paging执行完然后L224的ret后会进入C语言内核主函数. */
+   > 	pushl $_main
+   > 	jmp setup_paging
+   > L6:
+   > 	jmp L6			# main should never return here, but
+   > 				# just in case, we know what happens.
+   > 
+   > /* This is the default interrupt "handler" :-) */
+   > int_msg:
+   > 	.asciz "Unknown interrupt\n\r"
+   > .align 2
+   > ignore_int:
+   > 	pushl %eax
+   > 	pushl %ecx
+   > 	pushl %edx
+   > 	push %ds
+   > 	push %es
+   > 	push %fs
+   > 	movl $0x10,%eax
+   > 	mov %ax,%ds
+   > 	mov %ax,%es
+   > 	mov %ax,%fs
+   > 	pushl $int_msg
+   > 	call _printk
+   > 	popl %eax
+   > 	pop %fs
+   > 	pop %es
+   > 	pop %ds
+   > 	popl %edx
+   > 	popl %ecx
+   > 	popl %eax
+   > 	iret
+   > 
+   > .align 2
+   > setup_paging:
+   > 	movl $1024*5,%ecx		/* 5 pages - pg_dir+4 page tables */
+   > 	xorl %eax,%eax
+   > 	xorl %edi,%edi			/* pg_dir is at 0x000 */
+   > 	cld;rep;stosl
+   > 	movl $pg0+7,_pg_dir		/* set present bit/user r/w */ // NOTE: 放到内存起始位置处
+   > 	movl $pg1+7,_pg_dir+4		/*  --------- " " --------- */
+   > 	movl $pg2+7,_pg_dir+8		/*  --------- " " --------- */
+   > 	movl $pg3+7,_pg_dir+12		/*  --------- " " --------- */
+   > 	movl $pg3+4092,%edi
+   > 	movl $0xfff007,%eax		/*  16Mb - 4096 + 7 (r/w user,p) */
+   > 	std
+   > 1:	stosl			/* fill pages backwards - more efficient :-) */
+   > 	subl $0x1000,%eax
+   > 	jge 1b
+   > 	xorl %eax,%eax		/* pg_dir is at 0x0000 */
+   > 	movl %eax,%cr3		/* cr3 - page directory start */
+   > 	movl %cr0,%eax
+   > 	orl $0x80000000,%eax
+   > 	movl %eax,%cr0		/* set paging (PG) bit */ // NOTE: 打开分页
+   > 	ret			/* this also flushes prefetch-queue */
+   > ```
+   >
+   > 在`setup_idt`标签中将所有idt表项指向了`ignore_int`标签处, 作为未使用的中断描述符的默认值, 这样误用未使用中断描述符时就会打印提示信息. 而`setup_paging`标签中是在初始化页目录表及四个内核页表, 这是进入main函数前最后的操作, 没有办法被覆写, 只能剩余. 同时`after_page_tables`标签借助`setup_paging`标签最后的`ret`指令模拟压栈后main函数入口地址弹出给EIP, 切换到执行main函数. 因此`after_page_tables`也是必须保留的仍有用的代码.
+
+10. 为什么不用`call`, 而是用`ret`“调用”`main()`? 画出调用路线图, 给出代码证据.
+
+    > *Linux内核设计的艺术* **42**页.
+    >
+    > 不用`call`而是手动实现了`call`的所有操作只是一个逻辑问题: 内核主函数应当是最根本的函数, 被其他函数调用在逻辑上不够合理. 应当是面向过程式地执行一系列准备工作后执行主函数, 然后执行一些收尾操作.
+
+11. 用文字和图以`set_trap_gate(0,&divide_error)`为例说明中断描述符表是如何初始化的, 并给出代码证据.
+
+13. 读懂下面这段`include/asm/system.h`中的代码. 这里中断门, 陷阱门, 系统调用门都是通过`_set_gate()`设置的, 用的是同一个嵌入汇编代码, 比较明显的差别是DPL一个是3, 另外两个是0, 这是为什么?
+    ```c
+    #define _set_gate(gate_addr,type,dpl,addr) \
+    __asm__ ("movw %%dx,%%ax\n\t" \
+        "movw %0,%%dx\n\t" \
+        "movl %%eax,%1\n\t" \
+        "movl %%edx,%2" \
+        : \
+        : "i" ((short) (0x8000+(dpl<<13)+(type<<8))), \
+        "o" (*((char *) (gate_addr))), \
+        "o" (*(4+(char *) (gate_addr))), \
+        "d" ((char *) (addr)),"a" (0x00080000))
+    
+    #define set_intr_gate(n,addr) \
+        _set_gate(&idt[n],14,0,addr)
+    
+    #define set_trap_gate(n,addr) \
+        _set_gate(&idt[n],15,0,addr)
+    
+    #define set_system_gate(n,addr) \
+        _set_gate(&idt[n],15,3,addr)
+    ```
+    
+13. 进程0 fork进程1之前, 为什么先调用`move_to_user_mode()`? 用的是什么方法? 解释其中的道理.
+
+    >  *Linux内核设计的艺术* **78**-**80**页.
+    >
+    > 执行`move_to_user_mode()`前SS指向内存起始位置, ESP指向*stack_start* (*user_stack[1024]*的末端, 即内核栈的栈顶), 执行`move_to_user_mode()`后这个0特权级栈 (此时内核尚未完成初始化, 没有内核态用户态之分) 变为从内存起始位置到*stack_start*的3特权级0进程用户栈.
+
+14. 在Linux操作系统中大量使用了中断, 异常类的处理, 究竟有什么好处?
+
+    > **中断**和**异常**是一些提示性事件, 表明系统/处理器或当前执行的程序或任务中存在着某种需要处理器注意的状态. 典型情况下这些事件会导致当前运行程序/任务的执行强制转移到一个称为**中断处理程序**或**异常处理程序**的特殊软件/任务中. 处理器响应中断或异常所采取的行动称为**服务**.
+    >
+    > 典型情况下中断是在程序执行过程中随机发生的, 是对硬件信号的响应. 系统硬件使用中断去处理处理器的外部事件, 比如服务外设的请求. 此外软件可以使用`INT n`指令产生中断.
+    >
+    > 异常是在处理器执行指令的过程中发现错误状况而产生的. 
+    >
+    > 中断的意义: 摆脱轮询, 允许切换到其他任务, **主动激励, 被动响应**. 而异常的出现使针对特定类型错误进行相同处理成为可能. **一方面减少了系统的无效消耗, 提升了效率, 另一方面降低了开发复杂度**.
+
+15. `copy_process()`的参数最后五项是：`long eip,long cs,long eflags,long esp,long ss`, 查看栈结构确实有这五个参数, 奇怪的是其他参数的压栈代码都能找得到, 却找不到这五个参数的压栈代码, 反汇编代码中也查不到, 请解释原因.
+
+    > ```c
+    > int copy_process(
+    >     int nr,long ebp,long edi,long esi,long gs,
+    >     long none,
+    >     long ebx,long ecx,long edx,long fs,long es,long ds,
+    >     long eip,long cs,long eflags,long esp,long ss
+    > )
+    > ```
+    >
+    > `copy_process()`的参数由*kernel/system_call.s*中多个函数通过压栈传参. 通常最后压入栈的是最前面的参数 (可以更改). nr到gs为`_sys_fork`压入, none为`_system_call`中`call _sys_call_table(,%eax,4)`时压入的EIP (none只用于占位, 此EIP没有用), ebx到ds为`_system_call`压入, eip到ss为触发`INT 80`时硬件自动压入.
+
+17. 分析`get_free_page()`函数的代码, 叙述在主内存中获取一个空闲页的技术路线.
+
+18. 分析`copy_page_tables()`函数的代码, 叙述父进程如何为子进程复制页表.
+
+18. 进程0创建进程1时, 为进程1建立了`task_struct`及内核栈, 第一个页表, 分别位于物理内存16MB顶端倒数第一页, 第二页. 请问这两个页究竟占用的是谁的线性地址空间, 内核/进程0/进程1, 还是没有占用任何线性地址空间? 说明理由 (可以图示) 并给出代码证据.
+
+20. 假设经过一段时间的运行, 操作系统中已经有5个进程在运行, 且内核分别为进程4, 进程5创建了第一个页表, 这两个页表在谁的线性地址空间? 用图表示这两个页表在线性地址空间和物理地址空间的映射关系.
+
+21. 代码中的`ljmp %0\n\t` 很奇怪, 按理说`jmp`指令跳转到的位置应该是一条指令的地址, 可是这行代码却跳到了`"m" (*&__tmp.a)`, 这明明是一个数据的地址, 更奇怪的, 这行代码竟然能正确执行. 请论述其中的道理
+    ```c
+      #define switch_to(n) {\
+      struct {long a,b;} __tmp; \
+      __asm__("cmpl %%ecx,_current\n\t" \
+          "je 1f\n\t" \
+          "movw %%dx,%1\n\t" \
+          "xchgl %%ecx,_current\n\t" \
+          "ljmp %0\n\t" \
+          "cmpl %%ecx,_last_task_used_math\n\t" \
+          "jne 1f\n\t" \
+          "clts\n" \
+          "1:" \
+          ::"m" (*&__tmp.a),"m" (*&__tmp.b), \
+          "d" (_TSS(n)),"c" ((long) task[n])); \
+      }
+    ```
+    > *Linux内核设计的艺术* **106**-**107**页.
+    >
+    > 这个`ljmp`不能按字面意思理解为跳转到TSS这个数据段,  而是通过任务门机制保存当前进程任务现场至TSS, 并恢复进程n的TSS记录的任务现场, 强行切换至进程n.
+    
+21. 进程0开始创建进程1, 调用`fork()`, 跟踪代码时我们发现, `fork()`代码执行了两次, 第一次, 执行`fork()`代码后, 跳过`init()`直接执行了`for(;;) pause()`, 第二次执行`fork()`代码后, 执行了`init()`. 奇怪的是我们在代码中并没有看到跳转向`fork()`的goto语句, 也没有看到循环语句, 是什么原因导致fork反复执行? 请说明理由 (可以图示), 并给出代码证据.
+
+26. `getblk()`中, 申请空闲缓冲块的标准就是*b_count*为0, 而申请到之后为什么在`wait_on_buffer(bh)`后又执行`if (bh->b_count)`来判断*b_count*是否为0?
+
+27. *b_dirt*已经被置为1的缓冲块, 同步前能够被进程继续读/写?给出代码证据.
+
+28. 分析`panic()`的源代码, 根据你学过的操作系统知识, 完整准确地判断`panic()`所起的作用。假如操作系统设计为支持内核进程 (始终运行在0特权级的进程), 你将如何改进`panic()`?
+
+29. 详细分析进程调度的全过程. 考虑所有可能 (signal, alarm除外)
+
+30. `wait_on_buffer()`函数中为什么不用`if`而是用`while`?
+
+    > 因为当`sleep_on()`返回时当前在等待的缓冲块不一定解锁了, 可能当前进程触发的中断还没处理完, 也可能又被其他进程上锁了. 因此需要用`while`确保在当前块解锁的情况下才退出`wait_on_buffer()`函数
+    
+28. 操作系统如何利用*b_uptodate*保证缓冲块数据的正确性? `new_block(int dev)`函数新申请一个缓冲块后并没有读盘, *b_uptodate*却被置1, 是否会引起数据混乱? 详细分析理由.
+
+29. `add_request()`函数中下列代码前两行是什么意思?
+
+    ```c
+    if (!(tmp = dev->current_request)) {
+        dev->current_request = req;
+        sti();
+        (dev->request_fn)();
+        return;
+    }
+    ```
+
+30. `do_hd_request()`函数中*dev*的含义始终一样吗?
+
+30. `read_intr()`函数中, 下列代码是什么意思? 为什么这样做?
+
+    ```c
+    if (--CURRENT->nr_sectors) {
+        do_hd = &read_intr;
+        return;
+    }
+    ```
+
+31. `bread()`函数代码中为什么要做第二次`if (bh->b_uptodate)`判断?
+
+    ```c
+    if (bh->b_uptodate)
+        return bh;
+    ll_rw_block(READ,bh);
+    wait_on_buffer(bh);
+    if (bh->b_uptodate)
+        return bh;
+    ```
+
+32. `getblk()`函数中, 两次调用`wait_on_buffer()`函数, 两次的意思一样吗?
+
+33. 说明`getblk()`函数中下列代码什么情况下执行`continue`/`break`
+
+    ```c
+    do {
+        if (tmp->b_count)
+            continue;
+        if (!bh || BADNESS(tmp)<BADNESS(bh)) {
+            bh = tmp;
+            if (!BADNESS(tmp))
+                break;
+        }
+    /* and repeat until we find something good */
+    } while ((tmp = tmp->b_next_free) != free_list);
+    ```
+
+34. `make_request()`函数中下列代码中`sleep_on(&wait_for_request)`是谁在等? 等什么?
+
+    ```c
+    if (req < request) {
+        if (rw_ahead) {
+            unlock_buffer(bh);
+            return;
+        }
+        sleep_on(&wait_for_request);
+        goto repeat;
+    }
+    ```
 
 ## 32位80x86架构基础知识
 
@@ -380,17 +618,9 @@ CPU的逻辑电路被设计为只能运行内存中的程序, 因此加电瞬间
 
 因为将system模块挪至内存起始位置会覆盖掉BIOS的中断向量表和中断服务程序, 为了避免问题**setup**程序先用`cli`将CPU的EFLAGS中中断允许标志 (IF) 置为0==关闭了中断==, 然后才将system模块挪至内存起始位置.
 
-GDT IA32 49页, 第0个为NULL
-
 内核态与用户态的内存分页管理方式是不同的, 内核态的线性地址空间与物理地址空间是直接映射的, 内核可以直接获得物理地址, 而用户态线性地址与物理地址映射没有规律. 这样用户程序就无法根据线性地址推算对应物理地址, 使得内核能访问用户程序而用户程序无法访问其他用户的程序, 同时权限限制了用户程序无法访问内核内存空间 (其中是内核代码及数据).
 
-历史上由于函数 (子程序) 链接的需要, 发明了内存分段机制, 所有程序的设计都是基于段的.
-
 ## 设备环境初始化
-
-GDT不能称为段, 因为没有描述符用于描述GDT. ==但GDT本身确实在GDT的第二个?==
-
-- 保护模式是什么
 
 进程不会直接读写硬盘, 而是读写的内存中的缓冲区, 而缓冲区与硬盘间有同步机制. 进程并不知道数据何时被写到硬盘.
 
